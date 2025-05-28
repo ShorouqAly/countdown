@@ -17,13 +17,14 @@ app.use(bodyParser.json());
 app.use(express.static('public'));
 
 // MongoDB Connection
-mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/exclusivewire', {
-  useNewUrlParser: true,
-  useUnifiedTopology: true
-})
-.then(() => console.log('MongoDB connected'))
-.catch(err => console.error('MongoDB connection error:', err));
+const mongoURI = process.env.MONGO_URI || 'mongodb://localhost:27017/exclusivewire';
 
+mongoose.connect(mongoURI)
+  .then(() => console.log('✅ Connected to MongoDB Atlas'))
+  .catch((err) => {
+    console.error('❌ MongoDB connection error:', err.message);
+    process.exit(1);
+});
 // Mongoose Models
 const UserSchema = new mongoose.Schema({
   name: { type: String, required: true },
