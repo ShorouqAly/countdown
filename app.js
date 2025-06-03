@@ -828,6 +828,372 @@ const JournalistProfile = mongoose.model('JournalistProfile', JournalistProfileS
 const CompanyProfile = mongoose.model('CompanyProfile', CompanyProfileSchema);
 const PublisherProfile = mongoose.model('PublisherProfile', PublisherProfileSchema);
 
+
+// ENHANCED PROFILE ROUTES
+
+// Get journalist profile
+app.get('/api/profiles/journalist/:id', auth, async (req, res) => {
+  try {
+    const profile = await JournalistProfile.findOne({ userId: req.params.id })
+      .populate('userId', 'name email');
+    
+    if (!profile) {
+      return res.status(404).json({ message: 'Profile not found' });
+    }
+    
+    // Check if user can view this profile
+    const canView = profile.visibility.profilePublic || 
+                   req.user._id.toString() === req.params.id ||
+                   req.user.role === 'company';
+    
+    if (!canView) {
+      return res.status(403).json({ message: 'Profile is private' });
+    }
+    
+    // Increment view count if different user
+    if (req.user._id.toString() !== req.params.id) {
+      profile.analytics.profileViews += 1;
+      await profile.save();
+    }
+    
+    res.json(profile);
+  } catch (error) {
+    console.error('Get journalist profile error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Update journalist profile
+app.put('/api/profiles/journalist', auth, async (req, res) => {
+  try {
+    if (req.user.role !== 'journalist') {
+      return res.status(403).json({ message: 'Only journalists can update journalist profiles' });
+    }
+    
+    const profileData = {
+      ...req.body,
+      userId: req.user._id,
+      updated: new Date()
+    };
+    
+    // Calculate profile completeness
+    profileData.profileCompleteness = calculateProfileCompleteness(profileData);
+    
+    const profile = await JournalistProfile.findOneAndUpdate(
+      { userId: req.user._id },
+      profileData,
+      { new: true, upsert: true, runValidators: true }
+    );
+    
+    res.json(profile);
+  } catch (error) {
+    console.error('Update journalist profile error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Get company profile
+app.get('/api/profiles/company/:id', auth, async (req, res) => {
+  try {
+    const profile = await CompanyProfile.findOne({ userId: req.params.id })
+      .populate('userId', 'name email');
+    
+    if (!profile) {
+      return res.status(404).json({ message: 'Profile not found' });
+    }
+    
+    // Increment view count if different user
+    if (req.user._id.toString() !== req.params.id) {
+      profile.analytics.profileViews += 1;
+      await profile.save();
+    }
+    
+    res.json(profile);
+  } catch (error) {
+    console.error('Get company profile error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Update company profile
+app.put('/api/profiles/company', auth, async (req, res) => {
+  try {
+    if (req.user.role !== 'company') {
+      return res.status(403).json({ message: 'Only companies can update company profiles' });
+    }
+    
+    const profileData = {
+      ...req.body,
+      userId: req.user._id,
+      updated: new Date()
+    };
+    
+    const profile = await CompanyProfile.findOneAndUpdate(
+      { userId: req.user._id },
+      profileData,
+      { new: true, upsert: true, runValidators: true }
+    );
+    
+    res.json(profile);
+  } catch (error) {
+    console.error('Update company profile error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Search journalist profiles
+app.get('/api/profiles/search/journalists', auth, async (req, res) => {
+  try {
+    if (req.user.role !== 'company') {
+      return res.status(403).json({ message: 'Only companies can search journalist profiles' });
+    }
+    
+    const {
+      beats,
+      location,
+      experience,
+      publications,
+      responseTime,
+      storyTypes,
+      verified,
+      limit = 20,
+      offset = 0
+    } = req.query;
+    
+    let query = { 'visibility.searchable': true };
+    
+    // Build search filters
+    if (beats) {
+      const beatArray = beats.split(',');
+      query['beatDetails.category'] = { $in: beatArray };
+    }
+    
+    if (location) {
+      query.$or = [
+        { 'geographicCoverage.primary': new RegExp(location, 'i') },
+        { 'geographicCoverage.secondary': new RegExp(location, 'i') }
+      ];
+    }
+    
+    if (experience) {
+      query.yearsExperience = { $gte: parseInt(experience) };
+    }
+    
+    if (publications) {
+      const pubArray = publications.split(',');
+      query['publications.name'] = { $in: pubArray };
+    }
+    
+    if (responseTime) {
+      query['preferences.responseTime'] = responseTime;
+    }
+    
+    if (storyTypes) {
+      const typeArray = storyTypes.split(',');
+      query['preferences.storyTypes'] = { $in: typeArray };
+    }
+    
+    if (verified === 'true') {
+      query['verification.isVerified'] = true;
+    }
+    
+    const profiles = await JournalistProfile.find(query)
+      .populate('userId', 'name email')
+      .sort({ 'verification.trustScore': -1, 'analytics.profileViews': -1 })
+      .limit(parseInt(limit))
+      .skip(parseInt(offset));
+    
+    const total = await JournalistProfile.countDocuments(query);
+    
+    res.json({ profiles, total, hasMore: total > offset + profiles.length });
+  } catch (error) {
+    console.error('Search journalists error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Get enhanced matching suggestions
+app.get('/api/profiles/match/:announcementId', auth, async (req, res) => {
+  try {
+    if (req.user.role !== 'company') {
+      return res.status(403).json({ message: 'Only companies can get matches' });
+    }
+    
+    const announcement = await Announcement.findById(req.params.announcementId);
+    if (!announcement) {
+      return res.status(404).json({ message: 'Announcement not found' });
+    }
+    
+    // Enhanced matching algorithm
+    const matches = await getEnhancedMatches(announcement);
+    
+    res.json(matches);
+  } catch (error) {
+    console.error('Get matches error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Profile verification endpoint
+app.post('/api/profiles/verify/:userId', auth, async (req, res) => {
+  try {
+    // This would typically be admin-only in production
+    const { verificationType, verificationData } = req.body;
+    
+    if (req.user.role === 'journalist') {
+      const profile = await JournalistProfile.findOne({ userId: req.params.userId });
+      if (profile) {
+        profile.verification.isVerified = true;
+        profile.verification.verificationDate = new Date();
+        profile.verification.verificationMethod = verificationType;
+        profile.verification.trustScore = Math.min(profile.verification.trustScore + 25, 100);
+        await profile.save();
+      }
+    } else if (req.user.role === 'company') {
+      const profile = await CompanyProfile.findOne({ userId: req.params.userId });
+      if (profile) {
+        profile.verification.isVerified = true;
+        profile.verification.verificationDate = new Date();
+        profile.verification.verificationMethod = verificationType;
+        await profile.save();
+      }
+    }
+    
+    res.json({ message: 'Profile verified successfully' });
+  } catch (error) {
+    console.error('Verify profile error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Helper function for profile completeness
+function calculateProfileCompleteness(profile) {
+  let score = 0;
+  const maxScore = 100;
+  
+  // Basic information (30 points)
+  if (profile.bio) score += 10;
+  if (profile.yearsExperience) score += 5;
+  if (profile.specializations && profile.specializations.length > 0) score += 10;
+  if (profile.geographicCoverage && profile.geographicCoverage.primary) score += 5;
+  
+  // Beat details (25 points)
+  if (profile.beatDetails && profile.beatDetails.length > 0) {
+    score += 15;
+    if (profile.beatDetails.some(beat => beat.description)) score += 10;
+  }
+  
+  // Portfolio (20 points)
+  if (profile.portfolio && profile.portfolio.length > 0) {
+    score += 10;
+    if (profile.portfolio.length >= 3) score += 5;
+    if (profile.portfolio.some(item => item.url)) score += 5;
+  }
+  
+  // Publications (15 points)
+  if (profile.publications && profile.publications.length > 0) {
+    score += 10;
+    if (profile.publications.some(pub => pub.isPrimary)) score += 5;
+  }
+  
+  // Social media & contact (10 points)
+  if (profile.socialMedia) {
+    if (profile.socialMedia.twitter) score += 3;
+    if (profile.socialMedia.linkedin) score += 3;
+    if (profile.socialMedia.personal) score += 2;
+    if (profile.socialMedia.other && profile.socialMedia.other.length > 0) score += 2;
+  }
+  
+  return Math.min(score, maxScore);
+}
+
+// Enhanced matching algorithm
+async function getEnhancedMatches(announcement) {
+  const journalists = await JournalistProfile.find({
+    'visibility.searchable': true,
+    'beatDetails.category': { $in: announcement.journalistBeatTags }
+  }).populate('userId', 'name email');
+  
+  // Calculate match scores
+  const matches = journalists.map(journalist => {
+    let score = 0;
+    
+    // Beat matching (40 points)
+    const matchingBeats = journalist.beatDetails.filter(beat =>
+      announcement.journalistBeatTags.includes(beat.category)
+    );
+    score += matchingBeats.length * 10;
+    
+    // Expertise level bonus (10 points)
+    const expertBeats = matchingBeats.filter(beat => beat.expertiseLevel === 'expert');
+    score += expertBeats.length * 10;
+    
+    // Response time preference (15 points)
+    if (journalist.preferences.responseTime === 'immediate') score += 15;
+    else if (journalist.preferences.responseTime === 'same-day') score += 10;
+    else if (journalist.preferences.responseTime === 'within-week') score += 5;
+    
+    // Exclusive interest (15 points)
+    if (journalist.preferences.exclusiveInterest === 'high') score += 15;
+    else if (journalist.preferences.exclusiveInterest === 'medium') score += 10;
+    else score += 5;
+    
+    // Trust score (10 points)
+    score += journalist.verification.trustScore * 0.1;
+    
+    // Recent activity (5 points)
+    const daysSinceActive = (Date.now() - journalist.lastActive) / (1000 * 60 * 60 * 24);
+    if (daysSinceActive <= 7) score += 5;
+    else if (daysSinceActive <= 30) score += 3;
+    
+    // Profile completeness (5 points)
+    score += journalist.profileCompleteness * 0.05;
+    
+    return {
+      journalist,
+      score: Math.round(score),
+      matchingBeats: matchingBeats.map(beat => beat.category),
+      reasons: generateMatchReasons(matchingBeats, journalist, score)
+    };
+  });
+  
+  // Sort by score and return top matches
+  return matches
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 20);
+}
+
+function generateMatchReasons(matchingBeats, journalist, score) {
+  const reasons = [];
+  
+  if (matchingBeats.length > 0) {
+    reasons.push(`Covers ${matchingBeats.map(beat => beat.category).join(', ')}`);
+  }
+  
+  if (matchingBeats.some(beat => beat.expertiseLevel === 'expert')) {
+    reasons.push('Expert-level knowledge in relevant beats');
+  }
+  
+  if (journalist.preferences.responseTime === 'immediate') {
+    reasons.push('Fast response time');
+  }
+  
+  if (journalist.preferences.exclusiveInterest === 'high') {
+    reasons.push('High interest in exclusives');
+  }
+  
+  if (journalist.verification.isVerified) {
+    reasons.push('Verified journalist');
+  }
+  
+  if (journalist.verification.trustScore > 80) {
+    reasons.push('High trust score');
+  }
+  
+  return reasons;
+}
+
+
 // Start server
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 
