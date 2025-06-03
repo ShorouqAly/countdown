@@ -792,20 +792,21 @@ function generateMatchReasons(matchingBeats, journalist, score) {
 }
 
 // User Registration
+
 app.post('/api/users/register', async (req, res) => {
   try {
     const { name, email, password, role, beatTags, companyName, publication, bio } = req.body;
-    
+
     // Check if user already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(400).json({ message: 'User already exists' });
     }
-    
+
     // Hash password
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
-    
+
     // Create new user
     const user = new User({
       name,
@@ -817,12 +818,32 @@ app.post('/api/users/register', async (req, res) => {
       publication,
       bio
     });
-    
+
     await user.save();
-    
+
+    // Create corresponding profile
+    if (role === 'journalist') {
+      // Create JournalistProfile for this user
+      const journalistProfile = new JournalistProfile({
+        userId: user._id,
+        bio: bio || '',
+        // optionally set other fields, or leave default/empty
+      });
+      await journalistProfile.save();
+    } else if (role === 'company') {
+      // Create CompanyProfile for this user
+      const companyProfile = new CompanyProfile({
+        userId: user._id,
+        companyName: companyName || '',
+        industry: '', // you might want to get this from req.body
+      });
+      await companyProfile.save();
+    }
+    // You can add other roles similarly...
+
     // Create and return JWT token
     const token = jwt.sign({ id: user._id }, JWT_SECRET, { expiresIn: '24h' });
-    
+
     res.status(201).json({
       token,
       user: {
@@ -838,26 +859,48 @@ app.post('/api/users/register', async (req, res) => {
   }
 });
 
-// User Login
+// Login: check if profile exists, if not create it
 app.post('/api/users/login', async (req, res) => {
   try {
     const { email, password } = req.body;
-    
+
     // Find user by email
     const user = await User.findOne({ email });
     if (!user) {
       return res.status(400).json({ message: 'Invalid credentials' });
     }
-    
+
     // Validate password
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       return res.status(400).json({ message: 'Invalid credentials' });
     }
-    
+
+    // Check and create profile if not exists
+    if (user.role === 'journalist') {
+      let profile = await JournalistProfile.findOne({ userId: user._id });
+      if (!profile) {
+        profile = new JournalistProfile({
+          userId: user._id,
+          bio: user.bio || ''
+        });
+        await profile.save();
+      }
+    } else if (user.role === 'company') {
+      let profile = await CompanyProfile.findOne({ userId: user._id });
+      if (!profile) {
+        profile = new CompanyProfile({
+          userId: user._id,
+          companyName: user.companyName || '',
+          industry: ''
+        });
+        await profile.save();
+      }
+    }
+
     // Create and return JWT token
     const token = jwt.sign({ id: user._id }, JWT_SECRET, { expiresIn: '24h' });
-    
+
     res.json({
       token,
       user: {
@@ -872,6 +915,7 @@ app.post('/api/users/login', async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 });
+
 
 // COMPANY USER FLOW ROUTES
 
