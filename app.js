@@ -833,8 +833,9 @@ const PublisherProfile = mongoose.model('PublisherProfile', PublisherProfileSche
 
 // Get journalist profile
 app.get('/api/profiles/journalist/:id', auth, async (req, res) => {
+  const journalistId = req.params.id;
   try {
-    const profile = await JournalistProfile.findOne({ userId: req.params.id })
+    const profile = await JournalistProfile.findOne({ userId: journalistId })
       .populate('userId', 'name email');
     
     if (!profile) {
@@ -843,7 +844,7 @@ app.get('/api/profiles/journalist/:id', auth, async (req, res) => {
     
     // Check if user can view this profile
     const canView = profile.visibility.profilePublic || 
-                   req.user._id.toString() === req.params.id ||
+                   req.user._id.toString() === journalistId ||
                    req.user.role === 'company';
     
     if (!canView) {
@@ -851,7 +852,7 @@ app.get('/api/profiles/journalist/:id', auth, async (req, res) => {
     }
     
     // Increment view count if different user
-    if (req.user._id.toString() !== req.params.id) {
+    if (req.user._id.toString() !== journalistId) {
       profile.analytics.profileViews += 1;
       await profile.save();
     }
