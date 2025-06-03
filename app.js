@@ -792,10 +792,6 @@ function generateMatchReasons(matchingBeats, journalist, score) {
 }
 
 // User Registration
-
-const CompanyProfile = require('./models/CompanyProfile');
-const JournalistProfile = require('./models/JournalistProfile');
-
 app.post('/api/users/register', async (req, res) => {
   try {
     const { name, email, password, role, beatTags, companyName, publication, bio } = req.body;
