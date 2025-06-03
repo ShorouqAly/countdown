@@ -795,7 +795,28 @@ function generateMatchReasons(matchingBeats, journalist, score) {
 
 app.post('/api/users/register', async (req, res) => {
   try {
-    const { name, email, password, role, beatTags, companyName, publication, bio } = req.body;
+    const {
+      name,
+      email,
+      password,
+      role,
+      beatTags,
+      companyName,
+      publication,
+      bio,
+      industry // required for CompanyProfile
+    } = req.body;
+
+    if (!role || !['journalist', 'company'].includes(role)) {
+      return res.status(400).json({ message: 'Invalid role' });
+    }
+
+    // Check for required company fields
+    if (role === 'company') {
+      if (!companyName || !industry) {
+        return res.status(400).json({ message: 'Company name and industry are required for company accounts' });
+      }
+    }
 
     // Check if user already exists
     const existingUser = await User.findOne({ email });
@@ -807,7 +828,7 @@ app.post('/api/users/register', async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    // Create new user
+    // Create base User
     const user = new User({
       name,
       email,
@@ -821,27 +842,22 @@ app.post('/api/users/register', async (req, res) => {
 
     await user.save();
 
-    // Create corresponding profile
+    // Create role-specific profile
     if (role === 'journalist') {
-      // Create JournalistProfile for this user
       const journalistProfile = new JournalistProfile({
-        userId: user._id,
-        bio: bio || '',
-        // optionally set other fields, or leave default/empty
+        userId: user._id
       });
       await journalistProfile.save();
     } else if (role === 'company') {
-      // Create CompanyProfile for this user
       const companyProfile = new CompanyProfile({
         userId: user._id,
-        companyName: companyName || '',
-        industry: '', // you might want to get this from req.body
+        companyName,
+        industry
       });
       await companyProfile.save();
     }
-    // You can add other roles similarly...
 
-    // Create and return JWT token
+    // Generate JWT
     const token = jwt.sign({ id: user._id }, JWT_SECRET, { expiresIn: '24h' });
 
     res.status(201).json({
@@ -858,6 +874,7 @@ app.post('/api/users/register', async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 });
+
 
 // Login: check if profile exists, if not create it
 app.post('/api/users/login', async (req, res) => {
