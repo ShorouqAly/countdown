@@ -529,6 +529,305 @@ app.post('/api/announcements/:id/chat', auth, async (req, res) => {
   }
 });
 
+const JournalistProfileSchema = new mongoose.Schema({
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, unique: true },
+  // Professional Information
+  bio: { type: String, maxLength: 1000 },
+  yearsExperience: { type: Number, min: 0, max: 50 },
+  specializations: [String], // e.g., "Investigative Reporting", "Breaking News"
+  
+  // Beat Details (Enhanced from simple tags)
+  beatDetails: [{
+    category: { type: String, required: true }, // e.g., "Technology"
+    subcategories: [String], // e.g., ["AI", "Startups", "Enterprise Software"]
+    expertiseLevel: { type: String, enum: ['beginner', 'intermediate', 'expert'], default: 'intermediate' },
+    yearsInBeat: { type: Number, min: 0 },
+    description: String // Custom description of their coverage in this beat
+  }],
+  
+  // Portfolio & Work History
+  portfolio: [{
+    title: { type: String, required: true },
+    publication: { type: String, required: true },
+    url: String,
+    publishDate: Date,
+    category: String,
+    description: String,
+    isExclusive: { type: Boolean, default: false },
+    impact: String // Metrics or impact description
+  }],
+  
+  // Publications & Affiliations
+  publications: [{
+    name: { type: String, required: true },
+    role: String, // "Staff Writer", "Freelance", "Editor"
+    startDate: Date,
+    endDate: Date, // null if current
+    isPrimary: { type: Boolean, default: false },
+    contactInfo: {
+      email: String,
+      phone: String,
+      editorName: String,
+      editorEmail: String
+    }
+  }],
+  
+  // Coverage Preferences
+  preferences: {
+    storyTypes: [String], // "breaking", "analysis", "features", "interviews"
+    responseTime: { type: String, enum: ['immediate', 'same-day', 'within-week'], default: 'same-day' },
+    preferredLength: [String], // "brief", "standard", "long-form", "investigative"
+    exclusiveInterest: { type: String, enum: ['high', 'medium', 'low'], default: 'high' },
+    embargoComfort: { type: String, enum: ['comfortable', 'cautious', 'avoid'], default: 'comfortable' },
+    followUpPreference: { type: String, enum: ['email', 'phone', 'slack', 'any'], default: 'email' }
+  },
+  
+  // Geographic Coverage
+  geographicCoverage: {
+    primary: String, // "San Francisco Bay Area"
+    secondary: [String], // ["California", "West Coast"]
+    willTravel: { type: Boolean, default: false },
+    remote: { type: Boolean, default: true }
+  },
+  
+  // Social Media & Contact
+  socialMedia: {
+    twitter: String,
+    linkedin: String,
+    personal: String,
+    other: [{
+      platform: String,
+      url: String
+    }]
+  },
+  
+  // Professional Details
+  education: [{
+    institution: String,
+    degree: String,
+    field: String,
+    year: Number
+  }],
+  
+  awards: [{
+    name: String,
+    organization: String,
+    year: Number,
+    description: String
+  }],
+  
+  languages: [String],
+  
+  // Verification & Trust
+  verification: {
+    isVerified: { type: Boolean, default: false },
+    verificationDate: Date,
+    verificationMethod: String, // "email", "publication", "manual"
+    verifiedBy: String,
+    trustScore: { type: Number, min: 0, max: 100, default: 50 },
+    lastUpdated: { type: Date, default: Date.now }
+  },
+  
+  // Profile Settings
+  visibility: {
+    profilePublic: { type: Boolean, default: true },
+    contactInfoPublic: { type: Boolean, default: false },
+    portfolioPublic: { type: Boolean, default: true },
+    searchable: { type: Boolean, default: true }
+  },
+  
+  // Analytics
+  analytics: {
+    profileViews: { type: Number, default: 0 },
+    exclusivesClaimed: { type: Number, default: 0 },
+    storiesPublished: { type: Number, default: 0 },
+    responseRate: { type: Number, default: 0 },
+    avgResponseTime: { type: Number, default: 0 } // in hours
+  },
+  
+  // Timestamps
+  lastActive: { type: Date, default: Date.now },
+  profileCompleteness: { type: Number, default: 0 }, // 0-100%
+  created: { type: Date, default: Date.now },
+  updated: { type: Date, default: Date.now }
+});
+
+const CompanyProfileSchema = new mongoose.Schema({
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, unique: true },
+  
+  // Company Information
+  companyName: { type: String, required: true },
+  legalName: String,
+  website: String,
+  foundedYear: Number,
+  employeeCount: String, // "1-10", "11-50", "51-200", etc.
+  headquartersLocation: String,
+  otherLocations: [String],
+  
+  // Business Details
+  industry: { type: String, required: true },
+  subIndustries: [String],
+  businessModel: String, // "B2B", "B2C", "B2B2C", "Marketplace"
+  stage: String, // "Startup", "Growth", "Enterprise", "Public"
+  
+  // Company Description
+  elevator: String, // One-line description
+  description: String, // Longer description
+  mission: String,
+  values: [String],
+  
+  // Funding & Financial
+  fundingStage: String, // "Pre-Seed", "Seed", "Series A", etc.
+  totalFunding: String,
+  lastFundingDate: Date,
+  investors: [String],
+  isPublic: { type: Boolean, default: false },
+  stockSymbol: String,
+  
+  // Leadership Team
+  leadership: [{
+    name: { type: String, required: true },
+    title: { type: String, required: true },
+    bio: String,
+    linkedIn: String,
+    email: String,
+    isMediaContact: { type: Boolean, default: false },
+    isExecutive: { type: Boolean, default: false }
+  }],
+  
+  // Media & PR Information
+  mediaInfo: {
+    pressKitUrl: String,
+    logoUrl: String,
+    brandAssets: [String],
+    mediaContactName: String,
+    mediaContactEmail: String,
+    mediaContactPhone: String,
+    prAgency: String,
+    prAgencyContact: String
+  },
+  
+  // Announcement History
+  announcementHistory: [{
+    type: String,
+    title: String,
+    date: Date,
+    coverage: [{
+      publication: String,
+      journalist: String,
+      url: String,
+      reach: Number
+    }]
+  }],
+  
+  // Preferred Story Types
+  storyPreferences: {
+    announcementTypes: [String], // "funding", "product", "partnership", etc.
+    preferredTiming: String, // "immediate", "planned", "flexible"
+    exclusiveWillingness: { type: String, enum: ['always', 'sometimes', 'rarely'], default: 'sometimes' },
+    targetPublications: [String],
+    avoidPublications: [String]
+  },
+  
+  // Company Metrics
+  metrics: {
+    customers: String,
+    revenue: String, // Range like "$1M-10M"
+    growth: String,
+    marketShare: String,
+    keyMetrics: [{
+      name: String,
+      value: String,
+      period: String
+    }]
+  },
+  
+  // Verification
+  verification: {
+    isVerified: { type: Boolean, default: false },
+    verificationDate: Date,
+    verificationMethod: String,
+    businessRegistration: String,
+    website: String
+  },
+  
+  // Profile Analytics
+  analytics: {
+    profileViews: { type: Number, default: 0 },
+    announcementsSent: { type: Number, default: 0 },
+    pickupRate: { type: Number, default: 0 },
+    avgTimeToPickup: { type: Number, default: 0 }
+  },
+  
+  created: { type: Date, default: Date.now },
+  updated: { type: Date, default: Date.now }
+});
+
+const PublisherProfileSchema = new mongoose.Schema({
+  name: { type: String, required: true },
+  type: { type: String, enum: ['newspaper', 'magazine', 'digital', 'broadcast', 'podcast', 'newsletter'], required: true },
+  
+  // Publication Details
+  website: String,
+  description: String,
+  founded: Number,
+  circulation: Number,
+  monthlyReaders: Number,
+  socialFollowing: {
+    twitter: Number,
+    facebook: Number,
+    linkedin: Number,
+    instagram: Number
+  },
+  
+  // Editorial Information
+  editorial: {
+    editorInChief: String,
+    newsroomSize: Number,
+    editorialCalendar: String,
+    submissionGuidelines: String,
+    responseTime: String,
+    preferredFormat: String
+  },
+  
+  // Coverage Areas
+  coverageAreas: [String],
+  geography: String, // "Global", "US", "San Francisco", etc.
+  languages: [String],
+  
+  // Business Model
+  monetization: [String], // "subscription", "advertising", "events"
+  audience: {
+    primaryDemographic: String,
+    industries: [String],
+    jobTitles: [String]
+  },
+  
+  // Journalist Management
+  journalists: [{
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    role: String, // "Staff Writer", "Editor", "Freelance"
+    startDate: Date,
+    beats: [String],
+    isActive: { type: Boolean, default: true }
+  }],
+  
+  // Verification
+  verification: {
+    isVerified: { type: Boolean, default: false },
+    verificationDate: Date,
+    mediaListVerified: { type: Boolean, default: false }
+  },
+  
+  created: { type: Date, default: Date.now },
+  updated: { type: Date, default: Date.now }
+});
+
+// Create models
+const JournalistProfile = mongoose.model('JournalistProfile', JournalistProfileSchema);
+const CompanyProfile = mongoose.model('CompanyProfile', CompanyProfileSchema);
+const PublisherProfile = mongoose.model('PublisherProfile', PublisherProfileSchema);
+
 // Start server
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 
