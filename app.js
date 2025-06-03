@@ -793,32 +793,14 @@ function generateMatchReasons(matchingBeats, journalist, score) {
 
 // User Registration
 
+const CompanyProfile = require('./models/CompanyProfile');
+const JournalistProfile = require('./models/JournalistProfile');
+
 app.post('/api/users/register', async (req, res) => {
   try {
-    const {
-      name,
-      email,
-      password,
-      role,
-      beatTags,
-      companyName,
-      publication,
-      bio,
-      industry // required for CompanyProfile
-    } = req.body;
+    const { name, email, password, role, beatTags, companyName, publication, bio } = req.body;
 
-    if (!role || !['journalist', 'company'].includes(role)) {
-      return res.status(400).json({ message: 'Invalid role' });
-    }
-
-    // Check for required company fields
-    if (role === 'company') {
-      if (!companyName || !industry) {
-        return res.status(400).json({ message: 'Company name and industry are required for company accounts' });
-      }
-    }
-
-    // Check if user already exists
+    // Check if user exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(400).json({ message: 'User already exists' });
@@ -828,7 +810,7 @@ app.post('/api/users/register', async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    // Create base User
+    // Create new user
     const user = new User({
       name,
       email,
@@ -842,22 +824,25 @@ app.post('/api/users/register', async (req, res) => {
 
     await user.save();
 
-    // Create role-specific profile
-    if (role === 'journalist') {
-      const journalistProfile = new JournalistProfile({
-        userId: user._id
-      });
-      await journalistProfile.save();
-    } else if (role === 'company') {
+    // Create corresponding profile
+    if (role === 'company') {
       const companyProfile = new CompanyProfile({
         userId: user._id,
-        companyName,
-        industry
+        companyName: companyName || name,
+        industry: 'Other' // default to avoid validation error
       });
       await companyProfile.save();
+    } else if (role === 'journalist') {
+      const journalistProfile = new JournalistProfile({
+        userId: user._id,
+        bio,
+        beats: beatTags || [],
+        name
+      });
+      await journalistProfile.save();
     }
 
-    // Generate JWT
+    // Return token
     const token = jwt.sign({ id: user._id }, JWT_SECRET, { expiresIn: '24h' });
 
     res.status(201).json({
@@ -869,6 +854,7 @@ app.post('/api/users/register', async (req, res) => {
         role: user.role
       }
     });
+
   } catch (error) {
     console.error('Registration error:', error);
     res.status(500).json({ message: 'Server error' });
