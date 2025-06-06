@@ -89,15 +89,81 @@ const ChatSchema = new mongoose.Schema({
 
 const PaymentSchema = new mongoose.Schema({
   announcementId: { type: mongoose.Schema.Types.ObjectId, ref: 'Announcement', required: true },
-  amount: { type: Number, required: true },
-  payoutSplit: { type: Number, default: 0 }, // percentage for journalist
-  payoutTo: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-  status: { 
+  companyId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  journalistId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  
+  // Payment Details
+  totalAmount: { type: Number, required: true }, // in cents
+  platformFee: { type: Number, required: true },
+  journalistPayout: { type: Number, required: true },
+  tier: { type: String, enum: ['basic', 'professional', 'enterprise', 'premium'], required: true },
+  
+  // Payment Processing
+  stripePaymentIntentId: String,
+  stripeTransferId: String,
+  escrowStatus: { 
     type: String, 
-    enum: ['pending', 'completed', 'failed'], 
+    enum: ['pending', 'held', 'released', 'refunded'], 
     default: 'pending' 
   },
-  transactionDate: { type: Date, default: Date.now }
+  
+  // Completion Tracking
+  storyPublished: { type: Boolean, default: false },
+  storyUrl: String,
+  publicationDate: Date,
+  verificationStatus: { 
+    type: String, 
+    enum: ['pending', 'verified', 'disputed'], 
+    default: 'pending' 
+  },
+  
+  // Timestamps
+  paymentDate: { type: Date, default: Date.now },
+  releaseDate: Date,
+  refundDate: Date,
+  
+  // Metadata
+  paymentMethod: String,
+  currency: { type: String, default: 'USD' },
+  fees: {
+    stripeFee: Number,
+    platformFee: Number,
+    processingFee: Number
+  },
+  
+  // Dispute Management
+  disputeReason: String,
+  disputeDate: Date,
+  disputeResolution: String
+});
+
+// Journalist Earnings Schema
+const JournalistEarningsSchema = new mongoose.Schema({
+  journalistId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  
+  // Earnings Tracking
+  totalEarnings: { type: Number, default: 0 },
+  availableBalance: { type: Number, default: 0 },
+  pendingBalance: { type: Number, default: 0 },
+  
+  // Payout Information
+  stripeAccountId: String, // Stripe Connect account
+  payoutMethod: { type: String, enum: ['bank', 'paypal', 'wire'], default: 'bank' },
+  payoutSchedule: { type: String, enum: ['instant', 'weekly', 'monthly'], default: 'weekly' },
+  minimumPayout: { type: Number, default: 5000 }, // $50 minimum
+  
+  // Tax Information
+  taxId: String,
+  taxCountry: String,
+  w9Filed: { type: Boolean, default: false },
+  
+  // Performance Metrics
+  storiesCompleted: { type: Number, default: 0 },
+  averageEarningsPerStory: { type: Number, default: 0 },
+  completionRate: { type: Number, default: 0 },
+  
+  created: { type: Date, default: Date.now },
+  updated: { type: Date, default: Date.now }
 });
 
 // MONETIZATION SCHEMAS
@@ -626,6 +692,26 @@ const auth = async (req, res, next) => {
 
 // ENHANCED PROFILE ROUTES
 
+app.post('/api/payments/create-intent', auth, async (req, res) => {
+  // Calculate amounts based on tier
+  // Create Stripe payment intent
+  // Store payment record
+});
+
+// Process journalist payout
+app.post('/api/payments/payout/:paymentId', auth, async (req, res) => {
+  // Verify story publication
+  // Release escrow to journalist
+  // Update payment status
+});
+
+// Handle webhooks
+app.post('/api/payments/webhook', (req, res) => {
+  // Handle Stripe webhooks
+  // Update payment statuses
+  // Trigger notifications
+});
+
 // Get journalist profile
 app.get('/api/profiles/journalist/:id', auth, async (req, res) => {
   try {
@@ -904,6 +990,8 @@ app.get('/api/pricing/announcements', async (req, res) => {
     res.status(500).json({ message: 'Failed to get pricing' });
   }
 });
+
+
 
 // Get subscription plans
 app.get('/api/pricing/subscriptions', async (req, res) => {
