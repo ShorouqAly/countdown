@@ -7,6 +7,9 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 require('dotenv').config();
 
+const pricingRoutes = require('./routes/pricing');
+const paymentRoutes = require('./routes/payments');
+
 const app = express();
 const PORT = process.env.PORT || 5000;
 const JWT_SECRET = process.env.JWT_SECRET || 'exclusivewire-secret-key';
@@ -32,6 +35,8 @@ const UserSchema = new mongoose.Schema({
   password: { type: String, required: true },
   role: { type: String, enum: ['company', 'journalist'], required: true },
   beatTags: [String],
+  stripeCustomerId: String,
+  stripeConnectAccountId: String,
   companyName: String,
   publication: String,
   bio: String,
@@ -57,6 +62,12 @@ const AnnouncementSchema = new mongoose.Schema({
     enum: ['awaiting_claim', 'claimed', 'published', 'archived'], 
     default: 'awaiting_claim' 
   },
+  plan: String,
+  fee: Number,
+  pricingTierId: { type: mongoose.Schema.Types.ObjectId, ref: 'AnnouncementPricing' },
+  priorityPlacement: { type: Boolean, default: false },
+  useAiMatching: { type: Boolean, default: false },
+  guaranteedPickup: { type: Boolean, default: false },
   exclusiveClaimedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   needsWritingSupport: { type: Boolean, default: false },
   writingSupportType: { 
@@ -361,6 +372,13 @@ const AnnouncementPricing = mongoose.model('AnnouncementPricing', AnnouncementPr
 const EnhancedPayment = mongoose.model('EnhancedPayment', EnhancedPaymentSchema);
 const RevenueShare = mongoose.model('RevenueShare', RevenueShareSchema);
 const FeatureUsage = mongoose.model('FeatureUsage', FeatureUsageSchema);
+
+module.exports = {
+  SubscriptionPlan,
+  UserSubscription,
+  AnnouncementPricing,
+  EnhancedPayment
+};
 
 
 // Enhanced Profile Schemas
@@ -687,6 +705,16 @@ const auth = async (req, res, next) => {
     res.status(401).send({ error: 'Authentication required' });
   }
 };
+
+// Add these lines with your existing route usage
+app.use('/api/pricing', pricingRoutes);
+app.use('/api/payments', paymentRoutes);
+
+// Add Stripe webhook endpoint (raw body parser)
+app.post('/api/webhooks/stripe', express.raw({type: 'application/json'}), (req, res) => {
+  // Webhook handling code - implement later
+  res.json({received: true});
+});
 
 // Routes
 
