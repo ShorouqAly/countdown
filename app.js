@@ -100,6 +100,203 @@ const PaymentSchema = new mongoose.Schema({
   transactionDate: { type: Date, default: Date.now }
 });
 
+// MONETIZATION SCHEMAS
+
+const SubscriptionPlanSchema = new mongoose.Schema({
+  name: { type: String, required: true }, // "Analytics Pro", "Press Kit Manager"
+  description: String,
+  price: { type: Number, required: true }, // in cents
+  interval: { type: String, enum: ['month', 'year'], default: 'month' },
+  features: [String],
+  limits: {
+    profileViews: Number,
+    analyticsRetention: Number, // days
+    pressKitAssets: Number,
+    aiCredits: Number
+  },
+  stripePriceId: String,
+  isActive: { type: Boolean, default: true },
+  created: { type: Date, default: Date.now }
+});
+
+const UserSubscriptionSchema = new mongoose.Schema({
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  planId: { type: mongoose.Schema.Types.ObjectId, ref: 'SubscriptionPlan', required: true },
+  stripeSubscriptionId: String,
+  stripeCustomerId: String,
+  
+  status: { 
+    type: String, 
+    enum: ['active', 'past_due', 'canceled', 'unpaid', 'trialing'], 
+    default: 'active' 
+  },
+  
+  currentPeriodStart: Date,
+  currentPeriodEnd: Date,
+  cancelAtPeriodEnd: { type: Boolean, default: false },
+  
+  // Usage Tracking
+  usage: {
+    profileViews: { type: Number, default: 0 },
+    analyticsQueries: { type: Number, default: 0 },
+    pressKitDownloads: { type: Number, default: 0 },
+    aiCreditsUsed: { type: Number, default: 0 }
+  },
+  
+  // Reset monthly
+  usageResetDate: Date,
+  
+  created: { type: Date, default: Date.now },
+  updated: { type: Date, default: Date.now }
+});
+
+const AnnouncementPricingSchema = new mongoose.Schema({
+  name: { type: String, required: true },
+  price: { type: Number, required: true }, // in cents
+  journalistPayout: { type: Number, required: true }, // in cents
+  payoutPercentage: { type: Number, required: true }, // 0-100
+  
+  features: {
+    maxJournalists: Number,
+    priorityPlacement: { type: Boolean, default: false },
+    aiMatching: { type: Boolean, default: false },
+    analyticsIncluded: { type: Boolean, default: false },
+    pressKitAccess: { type: Boolean, default: false },
+    guaranteedPickup: { type: Boolean, default: false },
+    whiteGloveService: { type: Boolean, default: false }
+  },
+  
+  description: String,
+  isActive: { type: Boolean, default: true },
+  created: { type: Date, default: Date.now }
+});
+
+const EnhancedPaymentSchema = new mongoose.Schema({
+  // Existing payment fields...
+  announcementId: { type: mongoose.Schema.Types.ObjectId, ref: 'Announcement', required: true },
+  companyId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  journalistId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  
+  // Enhanced Payment Details
+  pricingTierId: { type: mongoose.Schema.Types.ObjectId, ref: 'AnnouncementPricing', required: true },
+  totalAmount: { type: Number, required: true },
+  platformFee: { type: Number, required: true },
+  journalistPayout: { type: Number, required: true },
+  processingFee: { type: Number, required: true },
+  
+  // Stripe Integration
+  stripePaymentIntentId: String,
+  stripeTransferId: String,
+  stripeCustomerId: String,
+  
+  // Escrow Management
+  escrowStatus: { 
+    type: String, 
+    enum: ['pending_payment', 'funds_held', 'released_to_journalist', 'refunded', 'disputed'], 
+    default: 'pending_payment' 
+  },
+  
+  escrowReleaseDate: Date,
+  escrowAmount: { type: Number, required: true },
+  
+  // Story Completion Tracking
+  storyRequirements: {
+    minWordCount: Number,
+    requiresInterview: { type: Boolean, default: false },
+    requiredQuotes: Number,
+    deadlineHours: { type: Number, default: 72 }
+  },
+  
+  storyDelivery: {
+    isCompleted: { type: Boolean, default: false },
+    storyUrl: String,
+    wordCount: Number,
+    publishDate: Date,
+    publicationName: String,
+    verificationStatus: { 
+      type: String, 
+      enum: ['pending', 'verified', 'needs_revision', 'approved'], 
+      default: 'pending' 
+    },
+    qualityScore: { type: Number, min: 1, max: 10 }
+  },
+  
+  // Revenue Sharing
+  revenueSplit: {
+    journalist: { type: Number, required: true },
+    platform: { type: Number, required: true },
+    processing: { type: Number, required: true }
+  },
+  
+  // Payment Timeline
+  paymentInitiated: { type: Date, default: Date.now },
+  fundsHeldDate: Date,
+  storyDeadline: Date,
+  payoutProcessedDate: Date,
+  
+  // Dispute Management
+  dispute: {
+    isDisputed: { type: Boolean, default: false },
+    reason: String,
+    initiatedBy: { type: String, enum: ['company', 'journalist', 'platform'] },
+    status: { type: String, enum: ['open', 'investigating', 'resolved'] },
+    resolution: String,
+    resolutionDate: Date
+  },
+  
+  created: { type: Date, default: Date.now },
+  updated: { type: Date, default: Date.now }
+});
+
+const RevenueShareSchema = new mongoose.Schema({
+  journalistId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  paymentId: { type: mongoose.Schema.Types.ObjectId, ref: 'EnhancedPayment', required: true },
+  
+  // Earnings Details
+  grossEarning: { type: Number, required: true },
+  platformFee: { type: Number, required: true },
+  netEarning: { type: Number, required: true },
+  
+  // Payout Processing
+  payoutMethod: { type: String, enum: ['stripe_connect', 'paypal', 'wire', 'check'], default: 'stripe_connect' },
+  payoutStatus: { 
+    type: String, 
+    enum: ['pending', 'processing', 'completed', 'failed', 'held'], 
+    default: 'pending' 
+  },
+  
+  payoutDate: Date,
+  payoutTransactionId: String,
+  
+  // Tax Information
+  taxableAmount: { type: Number, required: true },
+  taxYear: Number,
+  form1099Sent: { type: Boolean, default: false },
+  
+  created: { type: Date, default: Date.now }
+});
+
+const FeatureUsageSchema = new mongoose.Schema({
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  feature: { type: String, required: true }, // "analytics_query", "ai_matching", "press_kit_download"
+  usageDate: { type: Date, default: Date.now },
+  metadata: mongoose.Schema.Types.Mixed, // Store feature-specific data
+  cost: { type: Number, default: 0 }, // Credits or cost consumed
+  
+  // Billing Period
+  billingMonth: Number,
+  billingYear: Number
+});
+
+// Create models
+const SubscriptionPlan = mongoose.model('SubscriptionPlan', SubscriptionPlanSchema);
+const UserSubscription = mongoose.model('UserSubscription', UserSubscriptionSchema);
+const AnnouncementPricing = mongoose.model('AnnouncementPricing', AnnouncementPricingSchema);
+const EnhancedPayment = mongoose.model('EnhancedPayment', EnhancedPaymentSchema);
+const RevenueShare = mongoose.model('RevenueShare', RevenueShareSchema);
+const FeatureUsage = mongoose.model('FeatureUsage', FeatureUsageSchema);
+
+
 // Enhanced Profile Schemas
 const JournalistProfileSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, unique: true },
@@ -538,6 +735,663 @@ app.put('/api/profiles/company', auth, async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 });
+
+// Initialize default pricing tiers
+app.post('/api/admin/initialize-pricing', async (req, res) => {
+  try {
+    // Create default announcement pricing tiers
+    const pricingTiers = [
+      {
+        name: 'Basic',
+        price: 14900, // $149
+        journalistPayout: 2980, // $29.80 (20%)
+        payoutPercentage: 20,
+        features: {
+          maxJournalists: 10,
+          priorityPlacement: false,
+          aiMatching: false,
+          analyticsIncluded: false,
+          pressKitAccess: false,
+          guaranteedPickup: false,
+          whiteGloveService: false
+        },
+        description: 'Perfect for small announcements and testing the platform'
+      },
+      {
+        name: 'Professional',
+        price: 29900, // $299
+        journalistPayout: 7475, // $74.75 (25%)
+        payoutPercentage: 25,
+        features: {
+          maxJournalists: 25,
+          priorityPlacement: true,
+          aiMatching: true,
+          analyticsIncluded: true,
+          pressKitAccess: true,
+          guaranteedPickup: false,
+          whiteGloveService: false
+        },
+        description: 'Most popular - enhanced matching and analytics included'
+      },
+      {
+        name: 'Enterprise',
+        price: 59900, // $599
+        journalistPayout: 14975, // $149.75 (25%)
+        payoutPercentage: 25,
+        features: {
+          maxJournalists: 50,
+          priorityPlacement: true,
+          aiMatching: true,
+          analyticsIncluded: true,
+          pressKitAccess: true,
+          guaranteedPickup: false,
+          whiteGloveService: true
+        },
+        description: 'For major announcements requiring wide coverage'
+      },
+      {
+        name: 'Premium Exclusive',
+        price: 99900, // $999
+        journalistPayout: 29970, // $299.70 (30%)
+        payoutPercentage: 30,
+        features: {
+          maxJournalists: 100,
+          priorityPlacement: true,
+          aiMatching: true,
+          analyticsIncluded: true,
+          pressKitAccess: true,
+          guaranteedPickup: true,
+          whiteGloveService: true
+        },
+        description: 'Guaranteed pickup with top-tier journalists only'
+      }
+    ];
+    
+    await AnnouncementPricing.insertMany(pricingTiers);
+    
+    // Create default subscription plans
+    const subscriptionPlans = [
+      {
+        name: 'Analytics Pro',
+        price: 9900, // $99/month
+        description: 'Advanced analytics and performance tracking',
+        features: [
+          'Unlimited analytics queries',
+          'Custom reporting',
+          'Competitor tracking',
+          'ROI measurement',
+          'Export capabilities'
+        ],
+        limits: {
+          profileViews: 10000,
+          analyticsRetention: 365,
+          pressKitAssets: 0,
+          aiCredits: 0
+        }
+      },
+      {
+        name: 'Press Kit Manager',
+        price: 4900, // $49/month
+        description: 'Digital press kit management and sharing',
+        features: [
+          'Unlimited asset storage',
+          'Brand guidelines management',
+          'Auto-sharing with journalists',
+          'Usage analytics',
+          'Custom branding'
+        ],
+        limits: {
+          profileViews: 0,
+          analyticsRetention: 0,
+          pressKitAssets: -1, // unlimited
+          aiCredits: 0
+        }
+      },
+      {
+        name: 'AI Assistant',
+        price: 19900, // $199/month
+        description: 'AI-powered features and automation',
+        features: [
+          'Smart pitch personalization',
+          'Optimal timing predictions',
+          'Story performance scoring',
+          'Auto-generated follow-ups',
+          'Trend analysis'
+        ],
+        limits: {
+          profileViews: 0,
+          analyticsRetention: 0,
+          pressKitAssets: 0,
+          aiCredits: 500
+        }
+      },
+      {
+        name: 'Complete Suite',
+        price: 24900, // $249/month (save $25)
+        description: 'All premium features included',
+        features: [
+          'Everything in Analytics Pro',
+          'Everything in Press Kit Manager', 
+          'Everything in AI Assistant',
+          'Priority support',
+          'Custom integrations'
+        ],
+        limits: {
+          profileViews: -1, // unlimited
+          analyticsRetention: -1, // unlimited
+          pressKitAssets: -1, // unlimited
+          aiCredits: 1000
+        }
+      }
+    ];
+    
+    await SubscriptionPlan.insertMany(subscriptionPlans);
+    
+    res.json({ message: 'Pricing tiers and subscription plans initialized successfully' });
+  } catch (error) {
+    console.error('Initialize pricing error:', error);
+    res.status(500).json({ message: 'Failed to initialize pricing' });
+  }
+});
+
+// Get pricing tiers
+app.get('/api/pricing/announcements', async (req, res) => {
+  try {
+    const pricing = await AnnouncementPricing.find({ isActive: true }).sort({ price: 1 });
+    res.json(pricing);
+  } catch (error) {
+    console.error('Get pricing error:', error);
+    res.status(500).json({ message: 'Failed to get pricing' });
+  }
+});
+
+// Get subscription plans
+app.get('/api/pricing/subscriptions', async (req, res) => {
+  try {
+    const plans = await SubscriptionPlan.find({ isActive: true }).sort({ price: 1 });
+    res.json(plans);
+  } catch (error) {
+    console.error('Get subscription plans error:', error);
+    res.status(500).json({ message: 'Failed to get subscription plans' });
+  }
+});
+
+// Create payment intent for announcement
+app.post('/api/payments/announcement/create-intent', auth, async (req, res) => {
+  try {
+    if (req.user.role !== 'company') {
+      return res.status(403).json({ message: 'Only companies can create payment intents' });
+    }
+    
+    const { announcementId, pricingTierId } = req.body;
+    
+    const announcement = await Announcement.findById(announcementId);
+    if (!announcement || announcement.companyId.toString() !== req.user._id.toString()) {
+      return res.status(404).json({ message: 'Announcement not found' });
+    }
+    
+    const pricingTier = await AnnouncementPricing.findById(pricingTierId);
+    if (!pricingTier) {
+      return res.status(404).json({ message: 'Pricing tier not found' });
+    }
+    
+    // Calculate fees
+    const stripeFee = Math.round(pricingTier.price * 0.029 + 30); // 2.9% + 30¢
+    const platformFee = pricingTier.price - pricingTier.journalistPayout - stripeFee;
+    
+    // Create Stripe payment intent
+    const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: pricingTier.price,
+      currency: 'usd',
+      metadata: {
+        announcementId: announcementId,
+        pricingTierId: pricingTierId,
+        companyId: req.user._id.toString()
+      }
+    });
+    
+    // Create payment record
+    const payment = new EnhancedPayment({
+      announcementId,
+      companyId: req.user._id,
+      pricingTierId,
+      totalAmount: pricingTier.price,
+      platformFee,
+      journalistPayout: pricingTier.journalistPayout,
+      processingFee: stripeFee,
+      stripePaymentIntentId: paymentIntent.id,
+      escrowAmount: pricingTier.journalistPayout,
+      storyRequirements: {
+        minWordCount: pricingTier.name === 'Premium Exclusive' ? 800 : 500,
+        requiresInterview: pricingTier.features.whiteGloveService,
+        requiredQuotes: pricingTier.name === 'Premium Exclusive' ? 3 : 1,
+        deadlineHours: pricingTier.features.guaranteedPickup ? 24 : 72
+      },
+      revenueSplit: {
+        journalist: pricingTier.journalistPayout,
+        platform: platformFee,
+        processing: stripeFee
+      },
+      storyDeadline: new Date(Date.now() + (pricingTier.features.guaranteedPickup ? 24 : 72) * 60 * 60 * 1000)
+    });
+    
+    await payment.save();
+    
+    res.json({
+      clientSecret: paymentIntent.client_secret,
+      paymentId: payment._id,
+      pricing: pricingTier
+    });
+  } catch (error) {
+    console.error('Create payment intent error:', error);
+    res.status(500).json({ message: 'Failed to create payment intent' });
+  }
+});
+
+// Confirm payment and update announcement
+app.post('/api/payments/announcement/confirm', auth, async (req, res) => {
+  try {
+    const { paymentId, paymentIntentId } = req.body;
+    
+    const payment = await EnhancedPayment.findById(paymentId)
+      .populate('pricingTierId')
+      .populate('announcementId');
+    
+    if (!payment || payment.companyId.toString() !== req.user._id.toString()) {
+      return res.status(404).json({ message: 'Payment not found' });
+    }
+    
+    // Verify payment with Stripe
+    const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+    const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+    
+    if (paymentIntent.status === 'succeeded') {
+      // Update payment status
+      payment.escrowStatus = 'funds_held';
+      payment.fundsHeldDate = new Date();
+      await payment.save();
+      
+      // Update announcement with pricing tier features
+      const announcement = payment.announcementId;
+      announcement.plan = payment.pricingTierId.name;
+      announcement.fee = payment.totalAmount / 100; // Convert to dollars for display
+      announcement.status = 'awaiting_claim';
+      
+      // Add premium features based on pricing tier
+      if (payment.pricingTierId.features.priorityPlacement) {
+        announcement.priorityPlacement = true;
+      }
+      if (payment.pricingTierId.features.aiMatching) {
+        announcement.useAiMatching = true;
+      }
+      
+      await announcement.save();
+      
+      res.json({ 
+        success: true, 
+        message: 'Payment confirmed and announcement is now live',
+        announcement: announcement
+      });
+    } else {
+      res.status(400).json({ message: 'Payment not completed' });
+    }
+  } catch (error) {
+    console.error('Confirm payment error:', error);
+    res.status(500).json({ message: 'Failed to confirm payment' });
+  }
+});
+
+// Process story completion and journalist payout
+app.post('/api/payments/complete-story', auth, async (req, res) => {
+  try {
+    const { paymentId, storyUrl, wordCount, publicationName } = req.body;
+    
+    const payment = await EnhancedPayment.findById(paymentId)
+      .populate('journalistId')
+      .populate('pricingTierId');
+    
+    if (!payment) {
+      return res.status(404).json({ message: 'Payment not found' });
+    }
+    
+    // Verify user is the journalist who claimed it
+    if (req.user.role === 'journalist' && payment.journalistId._id.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+    
+    // Update story delivery information
+    payment.storyDelivery = {
+      isCompleted: true,
+      storyUrl,
+      wordCount,
+      publishDate: new Date(),
+      publicationName,
+      verificationStatus: 'pending'
+    };
+    
+    await payment.save();
+    
+    // Auto-approve if meets requirements
+    if (wordCount >= payment.storyRequirements.minWordCount) {
+      await processJournalistPayout(payment);
+      payment.storyDelivery.verificationStatus = 'approved';
+      payment.escrowStatus = 'released_to_journalist';
+      await payment.save();
+    }
+    
+    res.json({ 
+      success: true, 
+      message: 'Story submitted successfully',
+      payoutStatus: payment.escrowStatus
+    });
+  } catch (error) {
+    console.error('Complete story error:', error);
+    res.status(500).json({ message: 'Failed to process story completion' });
+  }
+});
+
+// Process journalist payout
+async function processJournalistPayout(payment) {
+  try {
+    const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+    
+    // Get journalist's Stripe Connect account
+    const journalistProfile = await JournalistProfile.findOne({ userId: payment.journalistId });
+    
+    if (!journalistProfile || !journalistProfile.stripeConnectAccountId) {
+      throw new Error('Journalist Stripe account not found');
+    }
+    
+    // Create transfer to journalist
+    const transfer = await stripe.transfers.create({
+      amount: payment.journalistPayout,
+      currency: 'usd',
+      destination: journalistProfile.stripeConnectAccountId,
+      metadata: {
+        paymentId: payment._id.toString(),
+        announcementId: payment.announcementId.toString()
+      }
+    });
+    
+    payment.stripeTransferId = transfer.id;
+    payment.payoutProcessedDate = new Date();
+    
+    // Create revenue share record
+    const revenueShare = new RevenueShare({
+      journalistId: payment.journalistId,
+      paymentId: payment._id,
+      grossEarning: payment.journalistPayout,
+      platformFee: Math.round(payment.journalistPayout * 0.03), // 3% platform fee on journalist earnings
+      netEarning: Math.round(payment.journalistPayout * 0.97),
+      payoutStatus: 'completed',
+      payoutDate: new Date(),
+      payoutTransactionId: transfer.id,
+      taxableAmount: payment.journalistPayout,
+      taxYear: new Date().getFullYear()
+    });
+    
+    await revenueShare.save();
+    
+    // Update journalist analytics
+    await JournalistProfile.findOneAndUpdate(
+      { userId: payment.journalistId },
+      {
+        $inc: {
+          'analytics.storiesPublished': 1,
+          'analytics.totalEarnings': payment.journalistPayout
+        }
+      }
+    );
+    
+    return transfer;
+  } catch (error) {
+    console.error('Process payout error:', error);
+    throw error;
+  }
+}
+
+// Subscribe to premium features
+app.post('/api/subscriptions/subscribe', auth, async (req, res) => {
+  try {
+    const { planId, paymentMethodId } = req.body;
+    
+    const plan = await SubscriptionPlan.findById(planId);
+    if (!plan) {
+      return res.status(404).json({ message: 'Plan not found' });
+    }
+    
+    const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+    
+    // Create or get Stripe customer
+    let customer;
+    const existingSubscription = await UserSubscription.findOne({ userId: req.user._id });
+    
+    if (existingSubscription && existingSubscription.stripeCustomerId) {
+      customer = await stripe.customers.retrieve(existingSubscription.stripeCustomerId);
+    } else {
+      customer = await stripe.customers.create({
+        email: req.user.email,
+        name: req.user.name,
+        metadata: {
+          userId: req.user._id.toString()
+        }
+      });
+    }
+    
+    // Attach payment method
+    await stripe.paymentMethods.attach(paymentMethodId, {
+      customer: customer.id,
+    });
+    
+    // Create subscription
+    const subscription = await stripe.subscriptions.create({
+      customer: customer.id,
+      items: [{ price: plan.stripePriceId }],
+      default_payment_method: paymentMethodId,
+      metadata: {
+        userId: req.user._id.toString(),
+        planId: planId
+      }
+    });
+    
+    // Save subscription to database
+    const userSubscription = new UserSubscription({
+      userId: req.user._id,
+      planId: planId,
+      stripeSubscriptionId: subscription.id,
+      stripeCustomerId: customer.id,
+      status: subscription.status,
+      currentPeriodStart: new Date(subscription.current_period_start * 1000),
+      currentPeriodEnd: new Date(subscription.current_period_end * 1000),
+      usageResetDate: new Date(subscription.current_period_end * 1000)
+    });
+    
+    await userSubscription.save();
+    
+    res.json({
+      success: true,
+      subscription: userSubscription,
+      plan: plan
+    });
+  } catch (error) {
+    console.error('Subscribe error:', error);
+    res.status(500).json({ message: 'Failed to create subscription' });
+  }
+});
+
+// Check feature access
+app.get('/api/features/check/:feature', auth, async (req, res) => {
+  try {
+    const { feature } = req.params;
+    const hasAccess = await checkFeatureAccess(req.user._id, feature);
+    
+    res.json({ hasAccess, feature });
+  } catch (error) {
+    console.error('Check feature access error:', error);
+    res.status(500).json({ message: 'Failed to check feature access' });
+  }
+});
+
+// Feature access checking function
+async function checkFeatureAccess(userId, feature) {
+  try {
+    const subscription = await UserSubscription.findOne({ 
+      userId, 
+      status: 'active',
+      currentPeriodEnd: { $gt: new Date() }
+    }).populate('planId');
+    
+    if (!subscription) {
+      return false; // No active subscription
+    }
+    
+    const plan = subscription.planId;
+    
+    // Check feature-specific limits
+    switch (feature) {
+      case 'analytics_pro':
+        return plan.limits.analyticsRetention > 0 || plan.limits.analyticsRetention === -1;
+      
+      case 'press_kit_manager':
+        return plan.limits.pressKitAssets > 0 || plan.limits.pressKitAssets === -1;
+      
+      case 'ai_assistant':
+        return plan.limits.aiCredits > 0 || plan.limits.aiCredits === -1;
+      
+      case 'enhanced_profiles':
+        return plan.limits.profileViews > 0 || plan.limits.profileViews === -1;
+      
+      default:
+        return false;
+    }
+  } catch (error) {
+    console.error('Check feature access error:', error);
+    return false;
+  }
+}
+
+// Track feature usage
+async function trackFeatureUsage(userId, feature, cost = 1) {
+  try {
+    const usage = new FeatureUsage({
+      userId,
+      feature,
+      cost,
+      billingMonth: new Date().getMonth() + 1,
+      billingYear: new Date().getFullYear()
+    });
+    
+    await usage.save();
+    
+    // Update subscription usage
+    await UserSubscription.findOneAndUpdate(
+      { userId, status: 'active' },
+      { $inc: { [`usage.${feature.replace('_', '')}`]: cost } }
+    );
+    
+    return true;
+  } catch (error) {
+    console.error('Track feature usage error:', error);
+    return false;
+  }
+}
+
+// Get user's current subscriptions and usage
+app.get('/api/subscriptions/current', auth, async (req, res) => {
+  try {
+    const subscriptions = await UserSubscription.find({ 
+      userId: req.user._id,
+      status: { $in: ['active', 'trialing'] }
+    }).populate('planId');
+    
+    res.json(subscriptions);
+  } catch (error) {
+    console.error('Get current subscriptions error:', error);
+    res.status(500).json({ message: 'Failed to get subscriptions' });
+  }
+});
+
+// Stripe webhooks
+app.post('/api/webhooks/stripe', express.raw({type: 'application/json'}), (req, res) => {
+  const sig = req.headers['stripe-signature'];
+  const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+  
+  let event;
+  
+  try {
+    event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
+  } catch (err) {
+    console.log(`Webhook signature verification failed.`, err.message);
+    return res.status(400).send(`Webhook Error: ${err.message}`);
+  }
+  
+  // Handle the event
+  switch (event.type) {
+    case 'payment_intent.succeeded':
+      // Handle successful payment
+      handlePaymentSucceeded(event.data.object);
+      break;
+    
+    case 'invoice.payment_succeeded':
+      // Handle successful subscription payment
+      handleSubscriptionPayment(event.data.object);
+      break;
+    
+    case 'customer.subscription.deleted':
+      // Handle subscription cancellation
+      handleSubscriptionCanceled(event.data.object);
+      break;
+    
+    default:
+      console.log(`Unhandled event type ${event.type}`);
+  }
+  
+  res.json({received: true});
+});
+
+async function handlePaymentSucceeded(paymentIntent) {
+  try {
+    const payment = await EnhancedPayment.findOne({ 
+      stripePaymentIntentId: paymentIntent.id 
+    });
+    
+    if (payment) {
+      payment.escrowStatus = 'funds_held';
+      payment.fundsHeldDate = new Date();
+      await payment.save();
+    }
+  } catch (error) {
+    console.error('Handle payment succeeded error:', error);
+  }
+}
+
+async function handleSubscriptionPayment(invoice) {
+  try {
+    const subscription = await UserSubscription.findOne({
+      stripeSubscriptionId: invoice.subscription
+    });
+    
+    if (subscription) {
+      subscription.status = 'active';
+      subscription.updated = new Date();
+      await subscription.save();
+    }
+  } catch (error) {
+    console.error('Handle subscription payment error:', error);
+  }
+}
+
+async function handleSubscriptionCanceled(subscription) {
+  try {
+    await UserSubscription.findOneAndUpdate(
+      { stripeSubscriptionId: subscription.id },
+      { status: 'canceled', updated: new Date() }
+    );
+  } catch (error) {
+    console.error('Handle subscription canceled error:', error);
+  }
+}
 
 // Search journalist profiles
 app.get('/api/profiles/search/journalists', auth, async (req, res) => {
