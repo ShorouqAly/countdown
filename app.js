@@ -369,12 +369,12 @@ const FeatureUsageSchema = new mongoose.Schema({
 });
 
 // Create models
-const SubscriptionPlan = mongoose.models.SubscriptionPlan || mongoose.model('SubscriptionPlan', subscriptionPlanSchema);
-const UserSubscription = mongoose.model('UserSubscription', UserSubscriptionSchema);
-const AnnouncementPricing = mongoose.model('AnnouncementPricing', AnnouncementPricingSchema);
-const EnhancedPayment = mongoose.model('EnhancedPayment', EnhancedPaymentSchema);
-const RevenueShare = mongoose.model('RevenueShare', RevenueShareSchema);
-const FeatureUsage = mongoose.model('FeatureUsage', FeatureUsageSchema);
+const SubscriptionPlan = mongoose.models.SubscriptionPlan || mongoose.model('SubscriptionPlan', SubscriptionPlanSchema);
+const UserSubscription = mongoose.models.UserSubscription || mongoose.model('UserSubscription', UserSubscriptionSchema);
+const AnnouncementPricing = mongoose.models.AnnouncementPricing || mongoose.model('AnnouncementPricing', AnnouncementPricingSchema);
+const EnhancedPayment = mongoose.models.EnhancedPayment || mongoose.model('EnhancedPayment', EnhancedPaymentSchema);
+const RevenueShare = mongoose.models.RevenueShare || mongoose.model('RevenueShare', RevenueShareSchema);
+const FeatureUsage = mongoose.models.FeatureUsage || mongoose.model('FeatureUsage', FeatureUsageSchema);
 
 module.exports = {
   SubscriptionPlan,
