@@ -19,6 +19,9 @@ app.use(cors());
 app.use(bodyParser.json());
 app.use(express.static('public'));
 
+app.use('/api/pricing', require('./routes/pricing'));
+app.use('/api/payments', require('./routes/payments'));
+
 // MongoDB Connection
 const mongoURI = process.env.MONGO_URI || 'mongodb://localhost:27017/exclusivewire';
 
