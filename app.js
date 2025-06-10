@@ -21,6 +21,7 @@ app.use(express.static('public'));
 
 app.use('/api/pricing', require('./routes/pricing'));
 app.use('/api/payments', require('./routes/payments'));
+app.use('/api/reviewmatch', require('./routes/reviewmatch'));
 
 // MongoDB Connection
 const mongoURI = process.env.MONGO_URI || 'mongodb://localhost:27017/exclusivewire';
@@ -33,6 +34,7 @@ mongoose.connect(mongoURI)
 });
 // Mongoose Models
 const UserSchema = new mongoose.Schema({
+  
   name: { type: String, required: true },
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true },
@@ -43,7 +45,23 @@ const UserSchema = new mongoose.Schema({
   companyName: String,
   publication: String,
   bio: String,
-  created: { type: Date, default: Date.now }
+  created: { type: Date, default: Date.now },
+  reviewMatchProfile: {
+    journalistProfile: {
+      specializations: [String],
+      outlet: String,
+      monthlyPageviews: Number,
+      socialFollowing: Number,
+      rating: { type: Number, default: 0 },
+      completedReviews: { type: Number, default: 0 }
+    },
+    companyProfile: {
+      industry: String,
+      companySize: String,
+      totalCampaigns: { type: Number, default: 0 },
+      totalSpend: { type: Number, default: 0 }
+    }
+  }
 });
 
 
@@ -712,6 +730,18 @@ const auth = async (req, res, next) => {
 // Add these lines with your existing route usage
 app.use('/api/pricing', pricingRoutes);
 app.use('/api/payments', paymentRoutes);
+
+const multer = require('multer');
+const upload = multer({ dest: 'uploads/' });
+
+// Rate limiting for API
+const rateLimit = require('express-rate-limit');
+const reviewMatchLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100 // limit each IP to 100 requests per windowMs
+});
+
+app.use('/api/reviewmatch', reviewMatchLimiter);
 
 // Add Stripe webhook endpoint (raw body parser)
 app.post('/api/webhooks/stripe', express.raw({type: 'application/json'}), (req, res) => {
