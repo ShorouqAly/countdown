@@ -369,7 +369,7 @@ const FeatureUsageSchema = new mongoose.Schema({
 });
 
 // Create models
-const SubscriptionPlan = mongoose.model('SubscriptionPlan', SubscriptionPlanSchema);
+const SubscriptionPlan = mongoose.models.SubscriptionPlan || mongoose.model('SubscriptionPlan', subscriptionPlanSchema);
 const UserSubscription = mongoose.model('UserSubscription', UserSubscriptionSchema);
 const AnnouncementPricing = mongoose.model('AnnouncementPricing', AnnouncementPricingSchema);
 const EnhancedPayment = mongoose.model('EnhancedPayment', EnhancedPaymentSchema);
