@@ -1,3 +1,6 @@
+// COMPLETE ENHANCED MEDIA VALUE ESTIMATOR SERVICE WITH UVM INTEGRATION
+// File: services/mediaValueEstimatorService.js
+
 const axios = require('axios');
 
 class MediaValueEstimatorService {
@@ -35,7 +38,7 @@ class MediaValueEstimatorService {
       'tier-4': 0.03     // 3% share tier-4 content
     };
 
-    // Industry benchmarks (existing code)
+    // Industry benchmarks
     this.benchmarks = {
       cpm: {
         'tier-1': { print: 15, digital: 8, tv: 25, radio: 12, podcast: 18 },
@@ -51,29 +54,39 @@ class MediaValueEstimatorService {
         default: { average: 2.00, high: 6.00 }
       },
       contentCreation: {
-        article: { basic: 200, standard: 500, premium: 1200 },
-        video: { basic: 800, standard: 2500, premium: 8000 },
-        podcast: { basic: 300, standard: 800, premium: 2000 },
-        infographic: { basic: 400, standard: 1000, premium: 2500 }
+        standard_article: { basic: 200, standard: 500, premium: 1200 },
+        feature_article: { basic: 400, standard: 800, premium: 2000 },
+        breaking_news: { basic: 300, standard: 600, premium: 1500 },
+        product_review: { basic: 350, standard: 700, premium: 1800 },
+        interview: { basic: 250, standard: 550, premium: 1400 },
+        press_release: { basic: 150, standard: 300, premium: 800 },
+        guest_post: { basic: 200, standard: 400, premium: 1000 },
+        award_announcement: { basic: 180, standard: 350, premium: 900 }
       },
       multipliers: {
         sentiment: { positive: 1.2, neutral: 1.0, negative: 0.3 },
         timing: { breaking: 1.8, trending: 1.4, evergreen: 1.0, outdated: 0.6 },
-        placement: { headline: 2.0, featured: 1.5, standard: 1.0, buried: 0.5 },
+        placement: { 
+          homepage_featured: 2.5,
+          category_featured: 1.8,
+          standard_article: 1.0,
+          newsletter_feature: 2.0,
+          social_exclusive: 0.8,
+          buried_mention: 0.4
+        },
         format: { video: 1.6, audio: 1.3, image: 1.2, text: 1.0 },
         exclusivity: { exclusive: 2.5, firstToReport: 2.0, embargo: 1.5, standard: 1.0 }
       }
     };
   }
 
-  // NEW: Main calculation method with UVM integration
+  // Main calculation method with UVM integration
   async calculateMediaValue(params) {
     const {
       publicationDomain,
-      useUVMData = true,    // NEW: Flag to use UVM integration
-      estimatedReach = null, // Will be calculated from UVM if not provided
+      useUVMData = true,
+      estimatedReach = null,
       actualImpressions = null,
-      // ... all other existing parameters
     } = params;
 
     try {
@@ -81,7 +94,7 @@ class MediaValueEstimatorService {
       let uvmData = null;
       let calculationMethod = 'manual_estimates';
 
-      // NEW: Try to get UVM data and calculate reach automatically
+      // Try to get UVM data and calculate reach automatically
       if (publicationDomain && useUVMData) {
         try {
           uvmData = await this.getUVMData(publicationDomain);
@@ -104,7 +117,6 @@ class MediaValueEstimatorService {
           }
         } catch (uvmError) {
           console.log(`UVM integration failed for ${publicationDomain}, using manual estimates:`, uvmError.message);
-          // Continue with manual estimates if UVM fails
         }
       }
 
@@ -126,7 +138,7 @@ class MediaValueEstimatorService {
     }
   }
 
-  // NEW: Get UVM data from our analytics service  
+  // Get UVM data from analytics service  
   async getUVMData(domain) {
     try {
       // Try quick lookup first (cached data)
@@ -171,7 +183,7 @@ class MediaValueEstimatorService {
     }
   }
 
-  // NEW: Calculate reach from UVM data using engagement rates
+  // Calculate reach from UVM data using engagement rates
   calculateReachFromUVM(uvmData, params) {
     const {
       contentType = 'standard_article',
@@ -227,16 +239,16 @@ class MediaValueEstimatorService {
     };
   }
 
-  // Existing calculation method (updated to handle UVM data)
+  // Core calculation method
   async performCalculation(params) {
     const {
       publicationTier = 'tier-3',
       mediaType = 'digital',
-      contentType = 'article',
+      contentType = 'standard_article',
       wordCount = 500,
       estimatedReach = null,
       actualImpressions = null,
-      placement = 'standard',
+      placement = 'standard_article',
       sentiment = 'neutral',
       timing = 'evergreen',
       exclusivity = 'standard',
@@ -273,10 +285,10 @@ class MediaValueEstimatorService {
         placement,
         timing,
         exclusivity,
-        uvmData // Pass UVM data for enhanced CPM calculations
+        uvmData
       });
 
-      // 2. Calculate SEO Value (enhanced with UVM data)
+      // 2. Calculate SEO Value
       const seoValue = this.calculateSEOValue({
         domainAuthority: effectiveDomainAuthority,
         backlink,
@@ -297,13 +309,13 @@ class MediaValueEstimatorService {
         productMention
       });
 
-      // 4. Calculate Social Media Amplification Value (enhanced)
+      // 4. Calculate Social Media Amplification Value
       const socialValue = this.calculateSocialValue({
         estimatedReach: impressions,
         publicationTier: effectiveTier,
         socialAmplification,
         contentType,
-        socialReach // Use calculated social reach if available
+        socialReach
       });
 
       // 5. Calculate Brand Authority Value
@@ -367,17 +379,17 @@ class MediaValueEstimatorService {
     const impressions = actualImpressions || estimatedReach || 10000;
     let baseCPM = customCPM || this.benchmarks.cpm[publicationTier][mediaType] || 5;
     
-    // NEW: Adjust CPM based on UVM data (larger publications = higher CPM)
+    // Adjust CPM based on UVM data
     if (uvmData && uvmData.monthlyVisitors) {
       if (uvmData.monthlyVisitors > 5000000) baseCPM *= 1.3;      // 5M+ monthly = premium CPM
       else if (uvmData.monthlyVisitors > 1000000) baseCPM *= 1.1; // 1M+ monthly = elevated CPM
       else if (uvmData.monthlyVisitors < 50000) baseCPM *= 0.8;   // <50K monthly = reduced CPM
     }
     
-    // Apply existing multipliers
-    const placementMultiplier = this.benchmarks.multipliers.placement[placement];
-    const timingMultiplier = this.benchmarks.multipliers.timing[timing];
-    const exclusivityMultiplier = this.benchmarks.multipliers.exclusivity[exclusivity];
+    // Apply multipliers
+    const placementMultiplier = this.benchmarks.multipliers.placement[placement] || 1.0;
+    const timingMultiplier = this.benchmarks.multipliers.timing[timing] || 1.0;
+    const exclusivityMultiplier = this.benchmarks.multipliers.exclusivity[exclusivity] || 1.0;
     
     const adjustedCPM = baseCPM * placementMultiplier * timingMultiplier * exclusivityMultiplier;
     
@@ -396,7 +408,7 @@ class MediaValueEstimatorService {
     if (!traffic && domainAuthority) {
       const baseTraffic = Math.round((domainAuthority / 10) * 50);
       
-      // NEW: Adjust based on UVM global rank data
+      // Adjust based on UVM global rank data
       let rankMultiplier = 1.0;
       if (uvmData && uvmData.globalRank) {
         if (uvmData.globalRank <= 10000) rankMultiplier = 2.0;
@@ -411,11 +423,31 @@ class MediaValueEstimatorService {
     }
     
     const paidTrafficValue = traffic * cpc;
-    
-    // Enhanced link authority value
-    const linkAuthorityValue = domainAuthority ? (domainAuthority * 8) : 100; // Higher multiplier
+    const linkAuthorityValue = domainAuthority ? (domainAuthority * 8) : 100;
     
     return paidTrafficValue + linkAuthorityValue;
+  }
+
+  // Calculate content creation value
+  calculateContentValue({ contentType, wordCount, publicationTier, customContentCost, executiveQuotes, productMention }) {
+    if (customContentCost) return customContentCost;
+    
+    const contentBenchmarks = this.benchmarks.contentCreation[contentType] || this.benchmarks.contentCreation.standard_article;
+    let baseValue = contentBenchmarks.standard;
+    
+    // Adjust for word count
+    if (wordCount > 1500) baseValue = contentBenchmarks.premium;
+    else if (wordCount < 300) baseValue = contentBenchmarks.basic;
+    
+    // Tier adjustments
+    const tierMultipliers = { 'tier-1': 1.5, 'tier-2': 1.2, 'tier-3': 1.0, 'tier-4': 0.8 };
+    baseValue *= tierMultipliers[publicationTier] || 1.0;
+    
+    // Premium content adjustments
+    if (executiveQuotes) baseValue *= 1.3;
+    if (productMention) baseValue *= 1.2;
+    
+    return baseValue;
   }
 
   // Enhanced social value calculation
@@ -433,7 +465,7 @@ class MediaValueEstimatorService {
     }
     
     const socialCPM = 7;
-    const formatMultiplier = this.benchmarks.multipliers.format[contentType === 'video' ? 'video' : 'text'];
+    const formatMultiplier = contentType === 'video' ? 1.6 : 1.0;
     
     return (socialCPM * socialImpressions * formatMultiplier) / 1000;
   }
@@ -444,19 +476,19 @@ class MediaValueEstimatorService {
     
     let baseBrandValue = { 'tier-1': 2000, 'tier-2': 1000, 'tier-3': 500, 'tier-4': 250 }[publicationTier];
     
-    // NEW: Adjust brand value based on publication authority
+    // Adjust brand value based on publication authority
     if (uvmData && uvmData.domainAuthority) {
-      const authorityMultiplier = 1 + (uvmData.domainAuthority / 200); // DA 100 = 1.5x multiplier
+      const authorityMultiplier = 1 + (uvmData.domainAuthority / 200);
       baseBrandValue *= authorityMultiplier;
     }
     
-    const placementMultiplier = this.benchmarks.multipliers.placement[placement];
-    const exclusivityMultiplier = this.benchmarks.multipliers.exclusivity[exclusivity];
+    const placementMultiplier = this.benchmarks.multipliers.placement[placement] || 1.0;
+    const exclusivityMultiplier = this.benchmarks.multipliers.exclusivity[exclusivity] || 1.0;
     
     return baseBrandValue * placementMultiplier * exclusivityMultiplier;
   }
 
-  // NEW: Generate UVM-specific insights
+  // Generate UVM-specific insights
   generateUVMInsights(uvmData, reachCalculation) {
     const insights = [];
     
@@ -506,9 +538,8 @@ class MediaValueEstimatorService {
     return Math.min(0.95, confidence);
   }
 
-  // ... (keep all existing helper methods: generateInsights, generateBenchmarkComparison, etc.)
+  // Generate insights
   generateInsights(breakdown, params) {
-    // Existing implementation
     const { totalEstimatedValue } = breakdown;
     const insights = [];
     
@@ -537,10 +568,10 @@ class MediaValueEstimatorService {
     return insights;
   }
 
+  // Generate benchmark comparison
   generateBenchmarkComparison(totalValue, params) {
-    // Existing implementation
     const industry = params.industry || 'default';
-    const tier = params.publicationTier;
+    const tier = params.publicationTier || params.uvmData?.tier || 'tier-3';
     
     const industryAverages = {
       'tier-1': { technology: 8500, finance: 12000, healthcare: 7000, retail: 5500, default: 7500 },
@@ -564,8 +595,8 @@ class MediaValueEstimatorService {
     };
   }
 
+  // Generate recommendations
   generateRecommendations(breakdown, params) {
-    // Existing implementation
     const recommendations = [];
     
     recommendations.push({
@@ -579,19 +610,40 @@ class MediaValueEstimatorService {
       ]
     });
     
+    const topValue = Math.max(
+      breakdown.advertisingValueEquivalency,
+      breakdown.seoValue,
+      breakdown.contentCreationValue,
+      breakdown.socialAmplificationValue,
+      breakdown.brandAuthorityValue
+    );
+    
+    if (topValue === breakdown.seoValue) {
+      recommendations.push({
+        category: 'seo_optimization',
+        title: 'SEO Optimization',
+        suggestions: [
+          'Ensure backlinks are properly implemented with relevant anchor text',
+          'Monitor referral traffic from this publication',
+          'Build relationships for future coverage opportunities'
+        ]
+      });
+    }
+    
     return recommendations;
   }
 
+  // Calculate confidence level
   calculateConfidenceLevel(params) {
-    // Existing implementation
     let confidence = 0.5;
     if (params.actualImpressions) confidence += 0.2;
     if (params.domainAuthority) confidence += 0.1;
+    if (params.estimatedReach) confidence += 0.1;
     return Math.min(0.95, confidence);
   }
 
+  // Format component names
   formatComponentName(key) {
-    // Existing implementation
     const names = {
       advertisingValueEquivalency: 'Advertising Value Equivalency',
       seoValue: 'SEO Value',
@@ -602,17 +654,20 @@ class MediaValueEstimatorService {
     return names[key] || key;
   }
 
+  // Validate parameters
   validateParams(params) {
-    // Existing implementation
     const errors = [];
     if (params.estimatedReach && params.estimatedReach < 0) {
       errors.push('Estimated reach must be positive');
     }
+    if (params.wordCount && params.wordCount < 0) {
+      errors.push('Word count must be positive');
+    }
     return errors;
   }
 
+  // Get industry benchmarks
   getIndustryBenchmarks() {
-    // Existing implementation
     return this.benchmarks;
   }
 }
