@@ -17,18 +17,7 @@ const mveLimiter = rateLimit({
 });
 
 // Basic auth middleware (integrate with your existing auth)
-const auth = (req, res, next) => {
-  req.user = {
-    _id: 'demo-user-id',
-    email: 'demo@example.com',
-    plan: 'free',
-    mveUsage: {
-      calculationsToday: 0,
-      dailyLimit: 10
-    }
-  };
-  next();
-};
+const auth = require('../middleware/auth'); // Your existing auth middleware
 
 // Check calculation limits for free users
 const checkCalculationLimits = (req, res, next) => {
