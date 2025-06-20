@@ -1,3 +1,5 @@
+const auth = require('../middleware/auth');
+
 router.get('/revenue', auth, async (req, res) => {
   try {
     const payments = await EnhancedPayment.aggregate([
