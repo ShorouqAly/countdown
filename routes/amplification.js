@@ -1,17 +1,17 @@
 const express = require('express');
 const router = express.Router();
 
-// Import the detailed routes from the component directory
-const amplificationComponentRoutes = require('../services/metaAmplificationService');
+router.post('/campaigns/create', async (req, res) => {
+  try {
+    const campaign = req.body;
 
-// Mount all the amplification routes
-router.use('/', amplificationComponentRoutes);
+    // Save campaign to DB here
+    console.log('Received campaign:', campaign);
 
-// You can add any additional middleware or routes here if needed
-// For example, logging middleware specific to amplification routes:
-router.use((req, res, next) => {
-  console.log(`[Amplification] ${req.method} ${req.originalUrl}`);
-  next();
+    res.status(201).json({ message: 'Campaign created', campaign });
+  } catch (error) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 module.exports = router;
