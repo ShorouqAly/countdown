@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 
 // Import the detailed routes from the component directory
-const amplificationComponentRoutes = require('../components/amplification/ArticleAmplifier/routes/amplification/amplification');
+const amplificationComponentRoutes = require('../services/metaAmplificationService');
 
 // Mount all the amplification routes
 router.use('/', amplificationComponentRoutes);
