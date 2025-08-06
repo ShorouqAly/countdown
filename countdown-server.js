@@ -1,52 +1,63 @@
 const express = require('express');
 const { createCanvas } = require('canvas');
+const GIFEncoder = require('gifencoder');
 
 const app = express();
 const port = 3000;
 
-const targetDate = new Date(Date.UTC(2025, 8, 13, 7, 0, 0)); // Sept 13, 2025, 7:00 UTC
+// 1-minute countdown = 60 seconds
+const countdownDuration = 60;
 
 app.get('/countdown.gif', (req, res) => {
-    const now = new Date();
-    let diff = Math.max(0, Math.floor((targetDate - now) / 1000));
+    const encoder = new GIFEncoder(500, 150);
+    res.setHeader('Content-Type', 'image/gif');
+    encoder.createReadStream().pipe(res);
 
-    const days = String(Math.floor(diff / (24 * 3600))).padStart(2, '0');
-    diff %= 24 * 3600;
-    const hours = String(Math.floor(diff / 3600)).padStart(2, '0');
-    diff %= 3600;
-    const minutes = String(Math.floor(diff / 60)).padStart(2, '0');
-    const seconds = String(diff % 60).padStart(2, '0');
+    encoder.start();
+    encoder.setRepeat(0); // loop forever
+    encoder.setDelay(1000); // 1 second per frame
+    encoder.setQuality(10);
 
-    const canvas = createCanvas(400, 120);
+    const canvas = createCanvas(500, 150);
     const ctx = canvas.getContext('2d');
 
-    // White background
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    for (let i = countdownDuration; i >= 0; i--) {
+        let diff = i;
 
-    // Orange countdown numbers
-    ctx.fillStyle = '#FF7A00';
-    ctx.font = 'bold 36px Arial';
-    ctx.textAlign = 'center';
+        const days = String(Math.floor(diff / (24 * 3600))).padStart(2, '0');
+        diff %= 24 * 3600;
+        const hours = String(Math.floor(diff / 3600)).padStart(2, '0');
+        diff %= 3600;
+        const minutes = String(Math.floor(diff / 60)).padStart(2, '0');
+        const seconds = String(diff % 60).padStart(2, '0');
 
-    const positions = [50, 150, 250, 350];
+        const timeText = `${days} : ${hours} : ${minutes} : ${seconds}`;
 
-    ctx.fillText(days, positions[0], 50);
-    ctx.fillText(hours, positions[1], 50);
-    ctx.fillText(minutes, positions[2], 50);
-    ctx.fillText(seconds, positions[3], 50);
+        // Background
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Labels below
-    ctx.font = '16px Arial';
-    ctx.fillText('Days', positions[0], 90);
-    ctx.fillText('Hours', positions[1], 90);
-    ctx.fillText('Minutes', positions[2], 90);
-    ctx.fillText('Seconds', positions[3], 90);
+        // Countdown digits
+        ctx.fillStyle = '#FF7A00';
+        ctx.font = 'bold 40px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText(timeText, 250, 70);
 
-    res.setHeader('Content-Type', 'image/png');
-    canvas.createPNGStream().pipe(res);
+        // Labels
+        ctx.font = '13px Arial';
+        const labels = ['Days', 'Hours', 'Minutes', 'Seconds'];
+        const positions = [100, 180, 270, 360];
+
+        for (let j = 0; j < labels.length; j++) {
+            ctx.fillText(labels[j], positions[j], 110);
+        }
+
+        encoder.addFrame(ctx);
+    }
+
+    encoder.finish();
 });
 
 app.listen(port, () => {
-    console.log(`Countdown server running on http://localhost:${port}`);
+    console.log(`Countdown server running at http://localhost:${port}/countdown.gif`);
 });
