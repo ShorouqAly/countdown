@@ -5,16 +5,16 @@ const GIFEncoder = require('gifencoder');
 const app = express();
 const port = 3000;
 
-// Sept 13, 2025, 9:00 AM CET = 7:00 AM UTC
+// Target: Sept 13, 2025, 9:00 AM CET = 7:00 AM UTC
 const targetDate = new Date(Date.UTC(2025, 8, 13, 7, 0, 0));
 
 app.get('/countdown.gif', (req, res) => {
     const now = new Date();
     const totalSeconds = Math.max(0, Math.floor((targetDate - now) / 1000));
-    const duration = Math.min(totalSeconds, 60); // Max 60 frames
+    const duration = Math.min(totalSeconds, 60); // Max 60 frames (60 seconds)
 
-    const width = 480;
-    const height = 100;
+    const width = 440; // Adjusted tightly
+    const height = 80;
 
     const encoder = new GIFEncoder(width, height);
     res.setHeader('Content-Type', 'image/gif');
@@ -40,29 +40,31 @@ app.get('/countdown.gif', (req, res) => {
 
         const timeParts = [days, hours, minutes, seconds];
         const labels = ['Days', 'Hours', 'Minutes', 'Seconds'];
-        const xPositions = [60, 160, 260, 360];
 
-        // Background
+        // Clear background (white)
         ctx.fillStyle = '#ffffff';
+        ctx.clearRect(0, 0, width, height);
         ctx.fillRect(0, 0, width, height);
 
         // Digits
         ctx.fillStyle = '#FF7A00';
-        ctx.textAlign = 'center';
         ctx.font = '48px Arial';
+        ctx.textAlign = 'center';
+
+        const positions = [55, 135, 215, 295]; // X positions for numbers
         for (let j = 0; j < 4; j++) {
-            ctx.fillText(timeParts[j], xPositions[j], 50);
+            ctx.fillText(timeParts[j], positions[j], 48);
         }
 
         // Colons
-        ctx.fillText(':', 110, 50);
-        ctx.fillText(':', 210, 50);
-        ctx.fillText(':', 310, 50);
+        ctx.fillText(':', 95, 48);
+        ctx.fillText(':', 175, 48);
+        ctx.fillText(':', 255, 48);
 
         // Labels
         ctx.font = '14px Arial';
         for (let j = 0; j < 4; j++) {
-            ctx.fillText(labels[j], xPositions[j], 85);
+            ctx.fillText(labels[j], positions[j], 72);
         }
 
         encoder.addFrame(ctx);
