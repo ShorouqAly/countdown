@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "main": "countdown-server.js",
   "scripts": {
+    "build": "npm rebuild canvas",
     "start": "node countdown-server.js"
   },
   "dependencies": {
