@@ -11,9 +11,9 @@ const targetDate = new Date(Date.UTC(2025, 8, 13, 7, 0, 0));
 app.get('/countdown.gif', (req, res) => {
     const now = new Date();
     const totalSeconds = Math.max(0, Math.floor((targetDate - now) / 1000));
-    const duration = Math.min(totalSeconds, 60); // Max 60 frames (60 seconds)
+    const duration = Math.min(totalSeconds, 180); // Max 60 frames (60 seconds)
 
-    const width = 300; // Adjusted tightly
+    const width = 330; // Adjusted tightly
     const height = 80;
 
     const encoder = new GIFEncoder(width, height);
