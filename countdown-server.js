@@ -5,24 +5,31 @@ const GIFEncoder = require('gifencoder');
 const app = express();
 const port = 3000;
 
-// 1-minute countdown = 60 seconds
-const countdownDuration = 60;
+// Sept 13, 2025, 9:00 AM CET = 7:00 AM UTC
+const targetDate = new Date(Date.UTC(2025, 8, 13, 7, 0, 0));
 
 app.get('/countdown.gif', (req, res) => {
-    const encoder = new GIFEncoder(500, 150);
+    const now = new Date();
+    const totalSeconds = Math.max(0, Math.floor((targetDate - now) / 1000));
+    const duration = Math.min(totalSeconds, 60); // Max 60 frames
+
+    const width = 480;
+    const height = 100;
+
+    const encoder = new GIFEncoder(width, height);
     res.setHeader('Content-Type', 'image/gif');
     encoder.createReadStream().pipe(res);
 
     encoder.start();
-    encoder.setRepeat(0); // loop forever
-    encoder.setDelay(1000); // 1 second per frame
+    encoder.setRepeat(0);
+    encoder.setDelay(1000);
     encoder.setQuality(10);
 
-    const canvas = createCanvas(500, 150);
+    const canvas = createCanvas(width, height);
     const ctx = canvas.getContext('2d');
 
-    for (let i = countdownDuration; i >= 0; i--) {
-        let diff = i;
+    for (let i = 0; i <= duration; i++) {
+        let diff = totalSeconds - i;
 
         const days = String(Math.floor(diff / (24 * 3600))).padStart(2, '0');
         diff %= 24 * 3600;
@@ -31,25 +38,31 @@ app.get('/countdown.gif', (req, res) => {
         const minutes = String(Math.floor(diff / 60)).padStart(2, '0');
         const seconds = String(diff % 60).padStart(2, '0');
 
-        const timeText = `${days} : ${hours} : ${minutes} : ${seconds}`;
+        const timeParts = [days, hours, minutes, seconds];
+        const labels = ['Days', 'Hours', 'Minutes', 'Seconds'];
+        const xPositions = [60, 160, 260, 360];
 
         // Background
         ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillRect(0, 0, width, height);
 
-        // Countdown digits
+        // Digits
         ctx.fillStyle = '#FF7A00';
-        ctx.font = '40px Arial';
         ctx.textAlign = 'center';
-        ctx.fillText(timeText, 250, 70);
+        ctx.font = '48px Arial';
+        for (let j = 0; j < 4; j++) {
+            ctx.fillText(timeParts[j], xPositions[j], 50);
+        }
+
+        // Colons
+        ctx.fillText(':', 110, 50);
+        ctx.fillText(':', 210, 50);
+        ctx.fillText(':', 310, 50);
 
         // Labels
-        ctx.font = '13px Arial';
-        const labels = ['Days', 'Hours', 'Minutes', 'Seconds'];
-        const positions = [100, 180, 270, 360];
-
-        for (let j = 0; j < labels.length; j++) {
-            ctx.fillText(labels[j], positions[j], 110);
+        ctx.font = '14px Arial';
+        for (let j = 0; j < 4; j++) {
+            ctx.fillText(labels[j], xPositions[j], 85);
         }
 
         encoder.addFrame(ctx);
