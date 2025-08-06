@@ -39,7 +39,7 @@ app.get('/countdown.gif', (req, res) => {
 
         // Countdown digits
         ctx.fillStyle = '#FF7A00';
-        ctx.font = 'bold 40px Arial';
+        ctx.font = '40px Arial';
         ctx.textAlign = 'center';
         ctx.fillText(timeText, 250, 70);
 
