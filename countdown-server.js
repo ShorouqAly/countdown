@@ -5,7 +5,7 @@ const GIFEncoder = require('gifencoder');
 const app = express();
 const port = 3000;
 
-// Target: Sept 13, 2025, 9:00 AM CET = 7:00 AM UTC
+// Target: April 26, 2026, 9:00 AM CET = 7:00 AM UTC
 const targetDate = new Date(Date.UTC(2026, 3, 26, 7, 0, 0));
 
 app.get('/countdown.gif', (req, res) => {
